@@ -1,0 +1,46 @@
+[package]
+name = "project-furkanaktas"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+embassy-executor = { version = "0.3", features = ["arch-cortex-m", "executor-thread", "defmt"] }
+embassy-sync = "0.5"
+
+# Embassy support for Raspberry Pi Pico (RP2040)
+embassy-rp = { version = "0.1", features = ["defmt", "time-driver"] }
+
+# HAL and async traits
+embedded-hal = "1.0.0"
+embedded-hal-async = "1.0.0"
+embedded-hal-bus = "0.1.0"
+
+# LCD driver (I2C)
+ag-lcd = "0.3.0"
+
+# Sensor driver for BMP280
+bmp280-ehal = "0.0.6"
+
+# PWM Controller
+pca9685 = "0.1.0"
+
+# Logging and debugging
+defmt = { version = "0.3", optional = true }
+
+defmt-rtt = "0.4"
+panic-probe = { version = "0.3", features = ["print-defmt"] }
+
+# Fixed-size buffers and strings
+heapless = "0.8"
+
+# Required for `cortex-m` targets
+cortex-m = "0.7"
+cortex-m-rt = "0.7"
+
+[features]
+default = ["defmt"]
+
+[profile.release]
+codegen-units = 1
+debug = 2
+lto = true
