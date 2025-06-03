@@ -3,44 +3,73 @@ name = "project-furkanaktas"
 version = "0.1.0"
 edition = "2024"
 
+[workspace.dependencies]
+embassy-sync = { version = "0.6.2", git = "https://github.com/embassy-rs/embassy", rev = "2e7a2b6", default-features = false }
+embassy-executor = { version = "0.7.0", git = "https://github.com/embassy-rs/embassy", rev = "2e7a2b6", default-features = false }
+embassy-futures = { version = "0.1.0", git = "https://github.com/embassy-rs/embassy", rev = "2e7a2b6", default-features = false }
+embassy-time = { version = "0.4.0", git = "https://github.com/embassy-rs/embassy", rev = "2e7a2b6", default-features = false }
+embassy-rp = { version = "0.3.0", git = "https://github.com/embassy-rs/embassy", rev = "2e7a2b6", default-features = false }
+embassy-usb = { version = "0.4.0", git = "https://github.com/embassy-rs/embassy", rev = "2e7a2b6", default-features = false }
+embassy-net = { version = "0.7.0", git = "https://github.com/embassy-rs/embassy", rev = "2e7a2b6", default-features = false }
+
+cyw43 = { version = "0.3.0", git = "https://github.com/embassy-rs/embassy", rev = "2e7a2b6", default-features = false }
+cyw43-pio = { version = "0.3.0", git = "https://github.com/embassy-rs/embassy", rev = "2e7a2b6", default-features = false }
+defmt = { version = "0.3", default-features = false }
+log = { version = "0.4", default-features = false }
+cortex-m-rt = { version = "0.7.0", default-features = false }
+critical-section = { version = "1.1", default-features = false }
+heapless = { version = "0.8", default-features = false }
+num-traits = { version = "0.2", default-features = false }
+
 [dependencies]
-embassy-executor = { version = "0.3", features = ["arch-cortex-m", "executor-thread", "defmt"] }
-embassy-sync = "0.5"
+embassy-sync = { workspace = true, features = ["defmt"] }
+embassy-executor = { workspace = true, features = ["task-arena-size-98304", "arch-cortex-m", "executor-thread", "executor-interrupt", "defmt"] }
+embassy-futures = { workspace = true }
+embassy-time = { workspace = true, features = ["defmt", "defmt-timestamp-uptime", "generic-queue-8"] } # generic-queue for with_timeout
+embassy-rp = { workspace = true, features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl", "rp235xa", "binary-info"] }
+embassy-usb = { workspace = true, features = ["defmt"] }
+embassy-net = { workspace = true, features = ["defmt", "tcp", "udp", "raw", "dhcpv4", "medium-ethernet", "dns"] }
+cyw43 = { workspace = true, features = ["defmt", "firmware-logs"] }
+cyw43-pio = { workspace = true, features = ["defmt"] }
+defmt = { workspace = true }
+log = { workspace = true }
+cortex-m-rt = { workspace = true }
+critical-section = { workspace = true }
+heapless = { workspace = true, features = ["ufmt"] }
+num-traits = { workspace = true }
 
-# Embassy support for Raspberry Pi Pico (RP2040)
-embassy-rp = { version = "0.1", features = ["defmt", "time-driver"] }
+hd44780-driver = "0.4.0" # For LCD
+embassy-lab-utils = { path = "./embassy-lab-utils" } # Local path dependency
+defmt-rtt = "0.4" # Logging backend for defmt
+fixed = "1.23.1"
+fixed-macro = "1.2"
+serde = { version = "1.0.203", default-features = false, features = ["derive"] }
+serde-json-core = "0.5.1"
+panic-probe = { version = "0.3", features = ["print-defmt"] } # Panic handler
+embedded-graphics = "0.8.1"
+display-interface-spi = "0.5.0"
+display-interface = "0.5.0"
+mipidsi = "0.8.0"
+embedded-hal-1 = { package = "embedded-hal", version = "1.0" } # For other peripherals if needed
+embedded-hal-async = "1.0" # For other peripherals if needed
+embedded-hal-bus = { version = "0.1", features = ["async"] }
+embedded-io-async = { version = "0.6.1", features = ["defmt-03"] }
+static_cell = "2.1"
+embedded-storage = { version = "0.3" }
+rand = { version = "0.8.5", default-features = false }
+embedded-sdmmc = "0.7.0"
+byte-slice-cast = { version = "1.2.0", default-features = false }
+ufmt = "0.2"
 
-# HAL and async traits
-embedded-hal = "1.0.0"
-embedded-hal-async = "1.0.0"
-embedded-hal-bus = "0.1.0"
 
-# LCD driver (I2C)
-ag-lcd = "0.3.0"
+[workspace]
+members = [
+    ".", 
+    "./embassy-lab-utils"
+]
+resolver = "2"
 
-# Sensor driver for BMP280
-bmp280-ehal = "0.0.6"
-
-# PWM Controller
-pca9685 = "0.1.0"
-
-# Logging and debugging
-defmt = { version = "0.3", optional = true }
-
-defmt-rtt = "0.4"
-panic-probe = { version = "0.3", features = ["print-defmt"] }
-
-# Fixed-size buffers and strings
-heapless = "0.8"
-
-# Required for `cortex-m` targets
-cortex-m = "0.7"
-cortex-m-rt = "0.7"
-
-[features]
-default = ["defmt"]
-
-[profile.release]
-codegen-units = 1
-debug = 2
-lto = true
+[workspace.package]
+rust-version = "1.85"
+edition = "2024"
+version = "0.1.0"
