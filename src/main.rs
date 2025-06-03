@@ -4,12 +4,11 @@
 use defmt::*;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
-use embassy_rp::peripherals::*;
 use embassy_rp::gpio::{Level, Output};
-use embassy_rp::pwm::Pwm;
-use embassy_rp::i2c::I2c;
+use embassy_rp::i2c::{self, I2c};
+use embassy_rp::peripherals::*;
+use embassy_rp::pwm::{self, Pwm};
 use embassy_time::{Delay, Timer};
-use embassy_rp::i2c;
 use panic_probe as _;
 
 use bmp280_ehal::BMP280;
@@ -20,54 +19,79 @@ async fn main(_spawner: Spawner) {
     info!("SmartAir project started.");
 
     let p = embassy_rp::init(Default::default());
-
-    // === I2C for BMP280 and LCD ===
-    let scl = p.PIN_1; // Adjust these according to your wiring
-    let sda = p.PIN_0;
-    let i2c = I2c::new_blocking(p.I2C0, scl, sda, i2c::Config::default());
-
     let mut delay = Delay;
 
-    // === Initialize BMP280 ===
-    let mut bmp280 = BMP280::new_primary(i2c, delay).unwrap();
-    bmp280.init().unwrap();
+    // === I2C for BMP280 ===
+    let scl = p.PIN_1;
+    let sda = p.PIN_0;
+    let i2c_sensor = I2c::new_blocking(p.I2C0, scl, sda, i2c::Config::default());
 
-    // === Re-split I2C for LCD (simple workaround, use real bus sharing in prod) ===
+    let mut bmp280 = match BMP280::new_primary(i2c_sensor, delay) {
+        Ok(sensor) => sensor,
+        Err(e) => {
+            error!("BMP280 init error: {:?}", e);
+            return;
+        }
+    };
+
+    if let Err(e) = bmp280.init() {
+        error!("BMP280 setup failed: {:?}", e);
+        return;
+    }
+
+    // === I2C for LCD ===
     let scl_lcd = p.PIN_3;
     let sda_lcd = p.PIN_2;
     let i2c_lcd = I2c::new_blocking(p.I2C1, scl_lcd, sda_lcd, i2c::Config::default());
 
     let mut lcd = I2cLcd::new(i2c_lcd, 0x27, Delay);
-    lcd.init(&mut Delay).unwrap();
-    lcd.clear(&mut Delay).unwrap();
+    if let Err(e) = lcd.init(&mut Delay) {
+        error!("LCD init error: {:?}", e);
+        return;
+    }
+    let _ = lcd.clear(&mut Delay);
 
-    // === DC Motor (PWM Pin) ===
-    let mut fan_pwm = Pwm::new_output_b(p.PWM_CH1, p.PIN_6); // Use the correct PWM channel and pin
-    fan_pwm.set_duty(fan_pwm.get_max_duty() / 2); // 50% speed
+    // === Fan PWM (DC motor) ===
+    let mut fan_pwm = Pwm::new(p.PWM_CH1);
+    fan_pwm.set_output_b(p.PIN_6);
+    fan_pwm.set_top(1000); // Set PWM resolution
     fan_pwm.enable();
 
-    // === Buzzer (GPIO Output) ===
+    // === Passive Buzzer ===
     let mut buzzer = Output::new(p.PIN_10, Level::Low);
 
     loop {
-        // Read temp from BMP280
-        let temp = bmp280.read_temperature().unwrap();
-        let pressure = bmp280.read_pressure().unwrap();
+        // Read temperature and pressure
+        let temp = match bmp280.read_temperature() {
+            Ok(t) => t,
+            Err(_) => {
+                error!("Temperature read failed");
+                continue;
+            }
+        };
 
-        info!("Temperature: {} °C, Pressure: {} Pa", temp, pressure);
+        let pressure = match bmp280.read_pressure() {
+            Ok(p) => p,
+            Err(_) => {
+                error!("Pressure read failed");
+                continue;
+            }
+        };
 
-        // Write to LCD
-        lcd.set_cursor_pos(0, 0, &mut Delay).unwrap();
-        lcd.write_str("Temp: ", &mut Delay).unwrap();
-        lcd.write_str_fmt(format_args!("{:.1}C", temp), &mut Delay).unwrap();
+        info!("Temperature: {:.1}°C, Pressure: {:.0} Pa", temp, pressure);
 
-        lcd.set_cursor_pos(1, 0, &mut Delay).unwrap();
-        lcd.write_str("Press: ", &mut Delay).unwrap();
-        lcd.write_str_fmt(format_args!("{:.0}Pa", pressure), &mut Delay).unwrap();
+        // Update LCD
+        let _ = lcd.set_cursor_pos(0, 0, &mut Delay);
+        let _ = lcd.write_str("Temp: ", &mut Delay);
+        let _ = lcd.write_str_fmt(format_args!("{:.1}C", temp), &mut Delay);
 
-        // Logic: if temperature > threshold, turn on fan + buzzer
+        let _ = lcd.set_cursor_pos(1, 0, &mut Delay);
+        let _ = lcd.write_str("Press: ", &mut Delay);
+        let _ = lcd.write_str_fmt(format_args!("{:.0}Pa", pressure), &mut Delay);
+
+        // Control logic
         if temp > 28.0 {
-            fan_pwm.set_duty(fan_pwm.get_max_duty() / 2);
+            fan_pwm.set_duty(fan_pwm.get_max_duty() / 2); // 50%
             buzzer.set_high();
         } else {
             fan_pwm.set_duty(0);
